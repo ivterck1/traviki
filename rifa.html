@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorteo Viajes Brite</title>
+    <style>
+        /* --- ESTILOS GENERALES --- */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap');
+
+        body {
+            background-color: #1a0f24;
+            color: #fff;
+            font-family: 'Roboto Mono', monospace;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #e040fb; /* LED Rosa */
+            text-shadow: 0 0 10px #e040fb, 0 0 20px #e040fb;
+            margin-bottom: 20px;
+        }
+
+        /* --- ESTILOS DEL PANEL --- */
+        #raffle-container {
+            position: relative;
+            width: 800px;
+            height: 640px; 
+            margin: 0 auto;
+            border: 3px solid #e040fb;
+            box-shadow: 0 0 25px #e040fb;
+        }
+
+        #raffle-background {
+            width: 100%;
+            height: 100%;
+            background-image: url('panel-fondo.jpg'); /* NOMBRE DE TU IMAGEN */
+            background-size: cover;
+            background-position: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            padding: 5.5% 8%;
+            box-sizing: border-box;
+            gap: 1.5%;
+        }
+
+        .box-cover {
+            background-color: rgba(15, 1, 26, 0.9);
+            border: 2px solid #6a1b9a;
+            transition: all 0.1s ease-in-out;
+        }
+
+        /* --- ESTADOS DE ANIMACIÓN --- */
+        .box-cover.highlight {
+            background-color: rgba(255, 255, 102, 0.9);
+            transform: scale(1.1);
+            border: 2px solid #fff;
+            box-shadow: 0 0 20px yellow;
+        }
+
+        .box-cover.winner-animation {
+            opacity: 0;
+            transform: scale(2); /* Efecto de explosión */
+            transition: all 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+        
+        /* NUEVO: ESTADO PERMANENTE PARA CAJAS YA ABIERTAS */
+        .box-cover.opened {
+            opacity: 0;
+            pointer-events: none; /* No se puede interactuar con ellas */
+        }
+
+        /* --- CONTROLES Y RESULTADOS --- */
+        #controls {
+            margin-top: 30px;
+        }
+
+        button {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 1.5em;
+            padding: 15px 30px;
+            border: none;
+            cursor: pointer;
+            background-color: #e040fb;
+            color: white;
+            border-radius: 10px;
+            text-shadow: 0 0 5px white;
+            box-shadow: 0 0 15px #e040fb;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px #e040fb;
+        }
+        
+        button:disabled {
+            background-color: #555;
+            color: #999;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 2.5em;
+            height: 50px;
+            color: #fdd835;
+            text-shadow: 0 0 10px #fdd835;
+        }
+        
+        @media (max-width: 850px) {
+            #raffle-container {
+                width: 95vw;
+                height: 76vw;
+            }
+            h1 { font-size: 1.8em; }
+            button { font-size: 1.2em; }
+            #result { font-size: 1.8em; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Rifa 2 Boletos Xcaret Viajes Brites</h1>
+
+    <div id="raffle-container">
+        <div id="raffle-background"></div>
+        <div id="grid-overlay"></div>
+    </div>
+
+    <div id="controls">
+        <button id="start-button">¡INICIAR SORTEO!</button>
+    </div>
+
+    <div id="result"></div>
+
+
+    <script>
+        const gridOverlay = document.getElementById('grid-overlay');
+        const startButton = document.getElementById('start-button');
+        const resultDisplay = document.getElementById('result');
+        const totalBoxes = 60;
+
+        // NUEVO: Array para guardar los números que ya ganaron
+        let pastWinners = [];
+
+        for (let i = 1; i <= totalBoxes; i++) {
+            const boxCover = document.createElement('div');
+            boxCover.classList.add('box-cover');
+            boxCover.dataset.number = i;
+            gridOverlay.appendChild(boxCover);
+        }
+        
+        const allCovers = document.querySelectorAll('.box-cover');
+
+        startButton.addEventListener('click', startRaffle);
+        
+        let lastHighlighted = null;
+
+        function startRaffle() {
+            // NUEVO: Comprobar si aún quedan números disponibles
+            if (pastWinners.length >= totalBoxes) {
+                resultDisplay.textContent = "¡Todos los números han sido sorteados!";
+                startButton.disabled = true;
+                return;
+            }
+
+            startButton.disabled = true;
+            startButton.textContent = 'Eligiendo...';
+            resultDisplay.textContent = '';
+            
+            // Limpiar la animación de explosión del ganador anterior
+            allCovers.forEach(cover => cover.classList.remove('winner-animation'));
+            
+            // NUEVO: Lógica para elegir un ganador que no haya salido antes
+            let winningNumber;
+            do {
+                winningNumber = Math.floor(Math.random() * totalBoxes) + 1;
+            } while (pastWinners.includes(winningNumber)); // Repetir si el número ya salió
+
+            // Guardar el nuevo ganador en nuestro registro
+            pastWinners.push(winningNumber);
+
+            // Iniciar animación
+            let interval = 50;
+            let duration = 3000;
+            let elapsed = 0;
+
+            const animationInterval = setInterval(() => {
+                if (lastHighlighted) {
+                    lastHighlighted.classList.remove('highlight');
+                }
+
+                // NUEVO: La animación solo brillará en cuadros que aún no han ganado
+                const availableCovers = document.querySelectorAll('.box-cover:not(.opened)');
+                const randomIndex = Math.floor(Math.random() * availableCovers.length);
+                const currentHighlight = availableCovers[randomIndex];
+                
+                if (currentHighlight) {
+                    currentHighlight.classList.add('highlight');
+                    lastHighlighted = currentHighlight;
+                }
+
+                elapsed += interval;
+                if (elapsed >= duration) {
+                    clearInterval(animationInterval);
+                    revealWinner(winningNumber);
+                }
+            }, interval);
+        }
+        
+        function revealWinner(winnerNumber) {
+            if (lastHighlighted) {
+                lastHighlighted.classList.remove('highlight');
+            }
+            
+            const winnerElement = document.querySelector(`.box-cover[data-number='${winnerNumber}']`);
+            
+            setTimeout(() => {
+                // Añadir clase de animación Y la clase permanente 'opened'
+                winnerElement.classList.add('winner-animation');
+                winnerElement.classList.add('opened');
+                
+                resultDisplay.textContent = `¡El Ganador es el Número ${winnerNumber}!`;
+                
+                startButton.disabled = false;
+                
+                // NUEVO: Cambiar texto del botón si aún quedan números
+                if(pastWinners.length < totalBoxes) {
+                    startButton.textContent = '¡SIGUIENTE PREMIO!';
+                } else {
+                    startButton.textContent = 'FIN DEL SORTEO';
+                    startButton.disabled = true; // Desactivar al final
+                }
+
+            }, 500);
+        }
+
+    </script>
+</body>
+</html>
